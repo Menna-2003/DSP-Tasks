@@ -56,11 +56,11 @@ def subtract_signals(sig1, sig2):
 
 def shifting_signal(indices, values, k, method):
   if method == "delay":
-    delayed_indices = indices + k
+    delayed_indices = indices + k  # Delay shifts signal right (indices decrease)
     return delayed_indices, values
   
   elif method == "advance":
-    advanced_indices = indices - k
+    advanced_indices = indices - k  # Advance shifts signal left (indices increase)
     return advanced_indices, values
 
 def fold_signal(indices, values):
