@@ -50,7 +50,10 @@ import math
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Test 1'))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Test 2'))
 from QuanTest1 import QuantizationTest1
+from QuanTest2 import QuantizationTest2
+from Task1 import read_signal_from_txt
 
 def quantize_and_encode(values, levels=None, bits=None):
     if not values:
@@ -97,15 +100,35 @@ def quantize_and_encode(values, levels=None, bits=None):
     # generate encodings and rotate backward by 1 level
     num_bits = math.ceil(math.log2(L))
     encoding = [format(i, f"0{num_bits}b") for i in range(L)]
-    encoding = [encoding[-1]] + encoding[:-1]  # rotate right by 1
-
 
     encoded_signal = []
     for q in quantized:
         idx = mid_points.index(min(mid_points, key=lambda m: abs(m - q)))
         encoded_signal.append(encoding[idx])
 
-    QuantizationTest1('Test 1/Quan1_Out.txt', encoded_signal, quantized)
+    # QuantizationTest1('Test 1/Quan1_Out.txt', encoded_signal, quantized)
+
+    # Calculate interval indices and sampled errors
+    interval_indices = []
+    sampled_errors = []
+    for i, x in enumerate(values):
+        # Find which interval this sample belongs to
+        idx = int((x - min_value) / delta)
+        if idx >= L:
+            idx = L - 1
+        if idx < 0:
+            idx = 0
+        interval_indices.append(idx + 1)
+        # Calculate error (quantized - original)
+        error = quantized[i] - x
+        sampled_errors.append(round(error, 3))
+    # Debug: Print the calculated values
+    print(f"Interval indices: {interval_indices}")
+    print(f"Encoded signal: {encoded_signal}")
+    print(f"Quantized values: {quantized}")
+    print(f"Sampled errors: {sampled_errors}")
+    
+    QuantizationTest2('Test 2/Quan2_Out.txt', interval_indices, encoded_signal, quantized, sampled_errors)
 
     return {
         "levels": L,
@@ -120,16 +143,23 @@ def quantize_and_encode(values, levels=None, bits=None):
 
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 
 def quantize_signal():
     try:
-        values_str = entry_values.get().strip()
-        if not values_str:
-            messagebox.showerror("Error", "Please enter the signal values separated by commas.")
+        global selected_file_path
+        if not hasattr(quantize_signal, 'selected_file_path') and 'selected_file_path' not in globals():
+            messagebox.showwarning("Warning", "Please select a signal file first.")
             return
-
-        values = [float(v.strip()) for v in values_str.split(",")]
+            
+        file_path = globals().get('selected_file_path')
+        if not file_path:
+            messagebox.showwarning("Warning", "Please select a signal file first.")
+            return
+            
+        # Read signal from file
+        indices, values = read_signal_from_txt(file_path)
+        values = values.tolist()  # Convert numpy array to list
 
         levels = entry_levels.get().strip()
         bits = entry_bits.get().strip()
@@ -163,8 +193,20 @@ def quantize_signal():
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
+def select_signal_file():
+    file_path = filedialog.askopenfilename(
+        title="Select Signal File",
+        filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+    )
+    if file_path:
+        # Store the selected file path for use in quantize_signal
+        global selected_file_path
+        selected_file_path = file_path
+        messagebox.showinfo("File Selected", f"Selected: {os.path.basename(file_path)}")
+
 
 # --- GUI Setup ---
+selected_file_path = None
 root = tk.Tk()
 root.title("Signal Quantization Tool")
 root.geometry("700x600")
@@ -176,9 +218,9 @@ title.pack(pady=10)
 frame_inputs = tk.Frame(root, bg="#f5f5f5")
 frame_inputs.pack(pady=5)
 
-tk.Label(frame_inputs, text="Enter Signal Values (comma-separated):", bg="#f5f5f5").grid(row=0, column=0, sticky="w")
-entry_values = tk.Entry(frame_inputs, width=60)
-entry_values.grid(row=1, column=0, columnspan=2, pady=5)
+tk.Label(frame_inputs, text="Select Signal File:", bg="#f5f5f5").grid(row=0, column=0, sticky="w")
+btn_select_file = tk.Button(frame_inputs, text="Browse Signal File", command=lambda: select_signal_file(), bg="#2196F3", fg="white")
+btn_select_file.grid(row=1, column=0, columnspan=2, pady=5)
 
 tk.Label(frame_inputs, text="Number of Levels:", bg="#f5f5f5").grid(row=2, column=0, sticky="w")
 entry_levels = tk.Entry(frame_inputs, width=10)

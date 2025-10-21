@@ -6,20 +6,20 @@ import os
 
 
 def read_signal_from_txt(path):
-  base_dir = os.path.dirname(__file__)
-  file_path = path
-  if not os.path.isabs(path):
-      candidate = os.path.join(base_dir, path)
-      if os.path.exists(candidate):
-          file_path = candidate
-  with open(file_path, 'r') as f:
-      N = int(f.readline().strip())
-      data = np.loadtxt(f)               # Read the rest (indices + values)
+    base_dir = os.path.dirname(__file__)
+    file_path = path
+    if not os.path.isabs(path):
+        candidate = os.path.join(base_dir, path)
+        if os.path.exists(candidate):
+            file_path = candidate
 
-  data = np.atleast_2d(data)
-  indices = data[:, 0]
-  values = data[:, 1]
-  return indices, values
+    # Read the file but skip first 3 lines
+    data = np.loadtxt(file_path, skiprows=3)
+
+    data = np.atleast_2d(data)
+    indices = data[:, 0]
+    values = data[:, 1]
+    return indices, values
 
 def plot_signal(indices, values, title="Signal"):
   plt.figure()
