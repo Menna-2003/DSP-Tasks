@@ -80,6 +80,16 @@ class TaskLauncher:
         status_frame = tk.Frame(self.root, bg="#f0f0f0")
         status_frame.pack(side="bottom", fill="x", padx=20, pady=10)
         
+        # Task 3 Button
+        self.create_task_button(
+            buttons_frame,
+            "Task 3: Signal Analysis Functions",
+            "Upload a signal and apply moving average, derivatives, or convolution",
+            self.run_task3,
+            "#9b59b6"
+        )
+
+
         self.status_label = tk.Label(
             status_frame,
             text="Ready to launch tasks",
@@ -184,6 +194,22 @@ class TaskLauncher:
             messagebox.showerror("Error", f"Failed to launch Task 2:\n{str(e)}")
             self.update_status("Failed to launch Task 2", "#e74c3c")
 
+    def run_task3(self):
+        """Run signal_functions.py (Signal Analysis App)"""
+        self.update_status("Launching Task 3...", "#9b59b6")
+
+        try:
+            if not os.path.exists("signal_functions.py"):
+                messagebox.showerror("Error", "signal_functions.py not found in the current directory!")
+                self.update_status("Task 3 not found", "#e74c3c")
+                return
+
+            subprocess.Popen([sys.executable, "signal_functions.py"])
+            self.update_status("Task 3 launched successfully", "#27ae60")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to launch Task 3:\n{str(e)}")
+            self.update_status("Failed to launch Task 3", "#e74c3c")
 
 def main():
     """Main function to run the launcher"""
