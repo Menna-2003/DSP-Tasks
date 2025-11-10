@@ -24,32 +24,59 @@ def read_signal_from_txt(path):
 
 # ========== Signal Operations ==========
 def moving_average(x, M):
-    y = []
-    for n in range(len(x)):
-        start = max(0, n - M + 1)
-        window = x[start:n+1]
-        avg = sum(window) / len(window)
-        y.append(avg)
+
+    N = len(x)
+    if M > N:
+        raise ValueError("Window size M cannot exceed signal length")
+
+    y = np.zeros(N - M + 1)
+
+    for n in range(len(y)):
+        window = x[n:n + M]
+        y[n] = np.sum(window) / M
+
     return y
 
+# def first_derivative(x):
+#     y = []
+#     for n in range(len(x)):
+#         if n == 0:
+#             y.append(x[0])
+#         else:
+#             y.append(x[n] - x[n - 1])
+#     return y
+
+
+# def second_derivative(x):
+#     y = []
+#     N = len(x)
+#     for n in range(N):
+#         xn_minus = x[n - 1] if n > 0 else 0
+#         xn_plus = x[n + 1] if n < N - 1 else 0
+#         y.append(xn_plus - 2 * x[n] + xn_minus)
+#     return y
 
 def first_derivative(x):
+    """
+    First derivative using forward difference:
+    y[n] = x[n+1] - x[n]
+    Output length = len(x) - 1
+    """
     y = []
-    for n in range(len(x)):
-        if n == 0:
-            y.append(x[0])
-        else:
-            y.append(x[n] - x[n - 1])
+    for n in range(len(x) - 1):
+        y.append(x[n + 1] - x[n])
     return y
 
 
 def second_derivative(x):
+    """
+    Second derivative using forward difference:
+    y[n] = x[n+2] - 2*x[n+1] + x[n]
+    Output length = len(x) - 2
+    """
     y = []
-    N = len(x)
-    for n in range(N):
-        xn_minus = x[n - 1] if n > 0 else 0
-        xn_plus = x[n + 1] if n < N - 1 else 0
-        y.append(xn_plus - 2 * x[n] + xn_minus)
+    for n in range(len(x) - 2):
+        y.append(x[n + 2] - 2 * x[n + 1] + x[n])
     return y
 
 
@@ -162,27 +189,208 @@ class SignalAnalysisApp:
         sig = self.get_signal()
         if not sig:
             return
+
         try:
             M = int(self.M_var.get())
         except ValueError:
-            messagebox.showerror("Error", "M must be an integer")
+            messagebox.showerror("Error", "Window size M must be an integer")
             return
-        result = moving_average(sig[1], M)
-        plot_signal(sig[0], result, f"{self.signal_var.get()} Moving Average (M={M})")
+
+        indices, values = sig
+        result = moving_average(values, M)
+
+        # --- Locate correct reference test file based on M ---
+        base_dir = os.path.dirname(__file__)
+        if M == 3:
+            ref_filename = "MovingAvg_out1.txt"
+        elif M == 5:
+            ref_filename = "MovingAvg_out2.txt"
+        else:
+            ref_filename = None
+
+        # --- Perform comparison if reference file exists ---
+        if ref_filename:
+            ref_path = os.path.join(base_dir, "task5", "testcases", "Moving Average testcases", ref_filename)
+
+            # If not found, search recursively
+            if not os.path.exists(ref_path):
+                found = None
+                search_root = os.path.join(base_dir, "task5", "testcases")
+                for root, dirs, files in os.walk(search_root):
+                    for file in files:
+                        if file.lower() == ref_filename.lower():
+                            found = os.path.join(root, file)
+                            break
+                    if found:
+                        break
+                if found:
+                    ref_path = found
+                else:
+                    messagebox.showerror(
+                        "Error",
+                        f"Reference file '{ref_filename}' not found anywhere under:\n{search_root}"
+                    )
+                    return
+
+            # --- Load and compare reference ---
+            ref_indices, ref_values = read_signal_from_txt(ref_path)
+            min_len = min(len(result), len(ref_values))
+            result_trimmed = np.array(result[:min_len])
+            ref_trimmed = np.array(ref_values[:min_len])
+
+            print("result_trimmed: ", result_trimmed)
+            print("ref_trimmed: ", ref_trimmed)
+            if np.allclose(result_trimmed, ref_trimmed, atol=1e-3):
+                messagebox.showinfo("Success", f"Moving Average (M={M}) matches {ref_filename}!")
+            else:
+                messagebox.showerror("Mismatch", f"Moving Average (M={M}) does NOT match {ref_filename}.")
+
+            # --- Plot comparison ---
+            plt.figure()
+            plt.stem(indices[:min_len], result_trimmed, linefmt='b-', markerfmt='bo',
+                    basefmt='k-', label=f'Computed MA (M={M})')
+            plt.stem(ref_indices[:min_len], ref_trimmed, linefmt='r--', markerfmt='rx',
+                    basefmt='k-', label=f'Expected ({ref_filename})')
+            plt.title(f"{self.signal_var.get()} - Moving Average Comparison (M={M})")
+            plt.xlabel("Index (n)")
+            plt.ylabel("Amplitude")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+        else:
+            # No reference file for other M values
+            plot_signal(indices, result, f"{self.signal_var.get()} Moving Average (M={M})")
+            messagebox.showinfo(
+                "Info",
+                f"Moving Average (M={M}) computed.\nNo reference test case exists for this window size."
+            )
 
     def apply_first_derivative(self):
         sig = self.get_signal()
         if not sig:
             return
-        result = first_derivative(sig[1])
-        plot_signal(sig[0], result, f"{self.signal_var.get()} First Derivative")
+        try:
+            indices, values = sig
+            result = first_derivative(values)
+
+            # --- Locate reference output file ---
+            base_dir = os.path.dirname(__file__)
+            ref_path = os.path.join(base_dir, "task5", "testcases", "Derivative testcases", "1st_derivative_out.txt")
+
+            # If not found, search automatically inside testcases/
+            if not os.path.exists(ref_path):
+                found = None
+                search_root = os.path.join(base_dir, "task5", "testcases")
+                for root, dirs, files in os.walk(search_root):
+                    for file in files:
+                        if file.lower() == "1st_derivative_out.txt":
+                            found = os.path.join(root, file)
+                            break
+                    if found:
+                        break
+
+                if found:
+                    ref_path = found
+                else:
+                    messagebox.showerror(
+                        "Error",
+                        "Reference file '1st_derivative_out.txt' not found under:\n"
+                        f"{search_root}"
+                    )
+                    return
+
+            # --- Load reference ---
+            ref_indices, ref_values = read_signal_from_txt(ref_path)
+
+            # Compare computed and reference
+            min_len = min(len(result), len(ref_values))
+            result_trimmed = np.array(result[:min_len])
+            ref_trimmed = np.array(ref_values[:min_len])
+
+            if np.allclose(result_trimmed, ref_trimmed, atol=1e-6):
+                messagebox.showinfo("Success", "First derivative matches the reference output!")
+            else:
+                messagebox.showerror("Mismatch", "First derivative does NOT match the expected output.")
+
+            # --- Plot comparison ---
+            plt.figure()
+            plt.stem(indices[:min_len], result_trimmed, linefmt='b-', markerfmt='bo',
+                     basefmt='k-', label='Computed 1st Derivative')
+            plt.stem(ref_indices[:min_len], ref_trimmed, linefmt='r--', markerfmt='rx',
+                     basefmt='k-', label='Expected (1st_derivative_out.txt)')
+            plt.title(f"{self.signal_var.get()} - First Derivative Comparison")
+            plt.xlabel("Index (n)")
+            plt.ylabel("Amplitude")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply first derivative:\n{e}")
 
     def apply_second_derivative(self):
         sig = self.get_signal()
         if not sig:
             return
-        result = second_derivative(sig[1])
-        plot_signal(sig[0], result, f"{self.signal_var.get()} Second Derivative")
+        try:
+            indices, values = sig
+            result = second_derivative(values)
+
+            # --- Locate reference output file ---
+            base_dir = os.path.dirname(__file__)
+            ref_path = os.path.join(base_dir, "task5", "testcases", "Derivative testcases", "2nd_derivative_out.txt")
+
+            # If not found, search automatically inside testcases/
+            if not os.path.exists(ref_path):
+                found = None
+                search_root = os.path.join(base_dir, "task5", "testcases")
+                for root, dirs, files in os.walk(search_root):
+                    for file in files:
+                        if file.lower() == "2nd_derivative_out.txt":
+                            found = os.path.join(root, file)
+                            break
+                    if found:
+                        break
+
+                if found:
+                    ref_path = found
+                else:
+                    messagebox.showerror(
+                        "Error",
+                        "Reference file '2nd_derivative_out.txt' not found under:\n"
+                        f"{search_root}"
+                    )
+                    return
+
+            # --- Load reference ---
+            ref_indices, ref_values = read_signal_from_txt(ref_path)
+
+            # Compare computed and reference
+            min_len = min(len(result), len(ref_values))
+            result_trimmed = np.array(result[:min_len])
+            ref_trimmed = np.array(ref_values[:min_len])
+
+            if np.allclose(result_trimmed, ref_trimmed, atol=1e-6):
+                messagebox.showinfo("Success", "Second derivative matches the reference output!")
+            else:
+                messagebox.showerror("Mismatch", "Second derivative does NOT match the expected output.")
+
+            # --- Plot comparison ---
+            plt.figure()
+            plt.stem(indices[:min_len], result_trimmed, linefmt='b-', markerfmt='bo',
+                     basefmt='k-', label='Computed 2nd Derivative')
+            plt.stem(ref_indices[:min_len], ref_trimmed, linefmt='r--', markerfmt='rx',
+                     basefmt='k-', label='Expected (2nd_derivative_out.txt)')
+            plt.title(f"{self.signal_var.get()} - Second Derivative Comparison")
+            plt.xlabel("Index (n)")
+            plt.ylabel("Amplitude")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply second derivative:\n{e}")
 
     def apply_convolution(self):
         sig1_name = self.conv_sig1_var.get()
@@ -203,14 +411,66 @@ class SignalAnalysisApp:
             indices1, values1 = self.signals[idx1]
             indices2, values2 = self.signals[idx2]
 
+            # Perform convolution
             y = convolve_signals(values1, values2)
             new_indices = np.arange(indices1[0] + indices2[0],
                                     indices1[-1] + indices2[-1] + 1)
 
-            plot_signal(new_indices, y, f"Convolution: {sig1_name} * {sig2_name}")
+            # --- Locate reference output file ---
+            base_dir = os.path.dirname(__file__)
+            ref_path = os.path.join(base_dir, "task5", "testcases", "Convolution testcases", "Conv_output.txt")
+
+            # If not found, search automatically inside testcases/
+            if not os.path.exists(ref_path):
+                found = None
+                search_root = os.path.join(base_dir, "task5", "testcases")
+                for root, dirs, files in os.walk(search_root):
+                    for file in files:
+                        if file.lower() == "conv_output.txt":
+                            found = os.path.join(root, file)
+                            break
+                    if found:
+                        break
+
+                if found:
+                    ref_path = found
+                else:
+                    messagebox.showerror(
+                        "Error",
+                        "Reference file 'Conv_output.txt' not found anywhere under:\n"
+                        f"{search_root}"
+                    )
+                    return
+
+            # --- Load reference output ---
+            ref_indices, ref_values = read_signal_from_txt(ref_path)
+
+            # Ensure both have the same length for comparison
+            min_len = min(len(y), len(ref_values))
+            y_trimmed = np.array(y[:min_len])
+            ref_trimmed = np.array(ref_values[:min_len])
+
+            # --- Compare results ---
+            if np.allclose(y_trimmed, ref_trimmed, atol=1e-6):
+                messagebox.showinfo("Success", "Convolution result matches the test case output!")
+            else:
+                messagebox.showerror("Mismatch", "Convolution result does NOT match the expected output.")
+
+            # --- Plot comparison ---
+            plt.figure()
+            plt.stem(new_indices[:min_len], y_trimmed, linefmt='b-', markerfmt='bo',
+                     basefmt='k-', label='Computed Output')
+            plt.stem(ref_indices[:min_len], ref_trimmed, linefmt='r--', markerfmt='rx',
+                     basefmt='k-', label='Expected Output (Conv_output.txt)')
+            plt.title(f"Convolution Comparison: {sig1_name} * {sig2_name}")
+            plt.xlabel("Index (n)")
+            plt.ylabel("Amplitude")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to apply convolution:\n{e}")
-
 
 # ========== Run ==========
 if __name__ == "__main__":
