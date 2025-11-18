@@ -24,44 +24,19 @@ def read_signal_from_txt(path):
 
 # ========== Signal Operations ==========
 def moving_average(x, M):
-
     N = len(x)
     if M > N:
         raise ValueError("Window size M cannot exceed signal length")
 
     y = np.zeros(N - M + 1)
-
     for n in range(len(y)):
         window = x[n:n + M]
         y[n] = np.sum(window) / M
 
     return y
 
-# def first_derivative(x):
-#     y = []
-#     for n in range(len(x)):
-#         if n == 0:
-#             y.append(x[0])
-#         else:
-#             y.append(x[n] - x[n - 1])
-#     return y
-
-
-# def second_derivative(x):
-#     y = []
-#     N = len(x)
-#     for n in range(N):
-#         xn_minus = x[n - 1] if n > 0 else 0
-#         xn_plus = x[n + 1] if n < N - 1 else 0
-#         y.append(xn_plus - 2 * x[n] + xn_minus)
-#     return y
 
 def first_derivative(x):
-    """
-    First derivative using forward difference:
-    y[n] = x[n+1] - x[n]
-    Output length = len(x) - 1
-    """
     y = []
     for n in range(len(x) - 1):
         y.append(x[n + 1] - x[n])
@@ -69,11 +44,6 @@ def first_derivative(x):
 
 
 def second_derivative(x):
-    """
-    Second derivative using forward difference:
-    y[n] = x[n+2] - 2*x[n+1] + x[n]
-    Output length = len(x) - 2
-    """
     y = []
     for n in range(len(x) - 2):
         y.append(x[n + 2] - 2 * x[n + 1] + x[n])
